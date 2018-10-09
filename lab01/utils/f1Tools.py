@@ -1,64 +1,89 @@
 from utils.automaton import Automaton
 
 
-class RemoveState:
-    def __init__(self, automaton):
-        self.automaton = automaton
-        self.workStack = []
-        self.abc = set()
-        self.found = set()
-        self.startPoints = set()
-        self.endPoints = set()
+class UnreachableRemover:
+    new_automaton = Automaton()
+    found_stack = []
+
+    def get_algo_start_points(self, automaton):
+        return automaton.startPoints
+
+    def add_algo_start_point(self, start_point):
+        self.new_automaton.add_start_point(start_point)
+
+    def get_filter(self, item):
+        return lambda conn : conn.first == item
+
+    def get_next_point(self, connection):
+        return connection.second
+
+    def get_algo_end_points(self, automaton):
+        return automaton.endPoints
+
+    def add_algo_end_point(self, end_point):
+        self.new_automaton.add_end_point(end_point)
 
 
-def remove_closed_states(automaton):
-    removeState = RemoveState(automaton)
-    workStack = removeState.workStack
+class UnproductiveRemover:
+    new_automaton = Automaton()
+    found_stack = []
 
-    for startPointIdx in automaton.startPointIdxs:
-        workStack.append(startPointIdx)
-        removeState.found.add(automaton.nodes[startPointIdx])
-        removeState.startPoints.add(automaton.nodes[startPointIdx])
+    def get_algo_start_points(self, automaton):
+        return automaton.endPoints
 
-        while len(workStack) > 0:
-            current = workStack.pop()
+    def add_algo_start_point(self, start_point):
+        self.new_automaton.add_end_point(start_point)
 
-            __find_connections__(removeState, current)
+    def get_filter(self, item):
+        return lambda conn : conn.second == item
 
-    return __create_automaton__(removeState)
+    def get_next_point(self, connection):
+        return connection.first
+
+    def get_algo_end_points(self, automaton):
+        return automaton.startPoints
+
+    def add_algo_end_point(self, end_point):
+        self.new_automaton.add_start_point(end_point)
 
 
-def __find_connections__(removeState, current):
-    for connection in removeState.automaton.connections[current]:
-        toNodeIdx = connection.toNode
-        toNode = removeState.automaton.nodes[toNodeIdx]
-        if not(toNode in removeState.found):
-            removeState.found.add(toNode)
-            removeState.abc.add(connection.value)
-            removeState.workStack.append(toNodeIdx)
+def remove_unreachable(automaton):
+    return __remove_helper__(automaton, UnreachableRemover())
 
-            if toNodeIdx in removeState.automaton.endPointIdxs:
-                removeState.endPoints.add(toNode)
 
-def __create_automaton__(removeState):
-    automaton = Automaton()
+def remove_unproductive(automaton):
+    return __remove_helper__(automaton, UnproductiveRemover())
 
-    for item in removeState.found:
-        automaton.add_node(item)
 
-    for remaining in removeState.found:
-        remainingIdx = removeState.automaton.nodes.index(remaining)
-        for connection in removeState.automaton.connections[remainingIdx]:
-            toNodePoint = removeState.automaton.nodes[connection.toNode]
-            if toNodePoint in removeState.found:
-                fromNodeIdx = automaton.nodes.index(remaining)
-                toNodeIdx = automaton.nodes.index(toNodePoint)
-                automaton.add_connection(fromNodeIdx, connection.value, toNodeIdx)
+def __remove_helper__(automaton, remover):
+    for item in remover.get_algo_start_points(automaton):
+        remover.new_automaton.add_node(item)
+        remover.add_algo_start_point(item)
 
-    for point in removeState.startPoints:
-        automaton.add_start_point_index(automaton.nodes.index(point))
+        remover.found_stack.append(item)
 
-    for point in removeState.endPoints:
-        automaton.add_end_point_index(automaton.nodes.index(point))
+        while len(remover.found_stack) > 0:
+            current = remover.found_stack.pop()
 
-    return automaton
+            __find_connection__(remover, current, automaton)
+
+    return remover.new_automaton
+
+
+def __find_connection__(remover, current, automaton):
+    for connection in filter(remover.get_filter(current), automaton.connections):
+        if not(remover.get_next_point(connection) in remover.new_automaton.nodes):
+            __add_new_node__(remover, connection, automaton)
+
+        remover.new_automaton.add_connection(
+            connection.first, connection.value, connection.second)
+
+
+def __add_new_node__(remover, connection, automaton):
+    next_point = remover.get_next_point(connection)
+    remover.found_stack.append(next_point)
+    remover.new_automaton.add_node(next_point)
+    remover.new_automaton.abc.add(connection.value)
+
+    if next_point in remover.get_algo_end_points(automaton):
+        remover.add_algo_end_point(next_point)

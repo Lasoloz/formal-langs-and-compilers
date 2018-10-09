@@ -1,4 +1,4 @@
-from utils.details import connection
+from utils.details.connection import Connection
 from sys import stdout, stdin
 
 
@@ -19,30 +19,27 @@ class Automaton:
         return process_input(states, abc, startPoints, endPoints, connections)
 
     def __init__(self):
-        self.nodes = []
+        self.nodes = set()
         self.connections = []
-        self.startPointIdxs = set()
-        self.endPointIdxs = set()
+        self.startPoints = set()
+        self.endPoints = set()
 
         self.abc = set()
 
     def add_node(self, node):
-        self.nodes.append(node)
-        self.connections.append([])
+        self.nodes.add(node)
 
-    def add_connection(self, firstIdx, value, secondIdx):
-        nodes = self.nodes
-        if firstIdx < len(nodes) and secondIdx < len(nodes):
-            self.connections[firstIdx].append(
-                connection.Connection(firstIdx, value, secondIdx))
+    def add_connection(self, first, value, second):
+        if first in self.nodes and second in self.nodes and value in self.abc:
+            self.connections.append(Connection(first, value, second))
+        else:
+            raise BaseException("Invalid connection!")
 
-        self.abc.add(value)
+    def add_start_point(self, point):
+        self.startPoints.add(point)
 
-    def add_start_point_index(self, index):
-        self.startPointIdxs.add(index)
-
-    def add_end_point_index(self, index):
-        self.endPointIdxs.add(index)
+    def add_end_point(self, point):
+        self.endPoints.add(point)
 
     def write(self, out):
         for node in self.nodes:
@@ -53,47 +50,35 @@ class Automaton:
             out.write(str(item) + ' ')
         out.write('\n')
 
-        for idx in self.startPointIdxs:
-            out.write(str(self.nodes[idx]) + ' ')
+        for item in self.startPoints:
+            out.write(str(item) + ' ')
         out.write('\n')
 
-        for idx in self.endPointIdxs:
-            out.write(str(self.nodes[idx]) + ' ')
+        for item in self.endPoints:
+            out.write(str(item) + ' ')
         out.write('\n')
 
-        for nodeConnections in self.connections:
-            for connection in nodeConnections:
-                fNode = self.nodes[connection.fromNode]
-                value = connection.value
-                tNode = self.nodes[connection.toNode]
-                out.write(str(fNode) + ' ' + str(value) +
-                          ' ' + str(tNode) + '\n')
+        for connection in self.connections:
+            out.write(str(connection.first) + ' ' +
+                      str(connection.value) + ' ' + str(connection.second) + '\n')
 
 
 def process_input(states, abc, startPoints, endPoints, connections):
     automaton = Automaton()
-    abcSet = set()
 
     for state in states:
         automaton.add_node(state)
 
     for item in abc:
-        abcSet.add(item)
+        automaton.abc.add(item)
 
     for startPoint in startPoints:
-        pointIdx = automaton.nodes.index(startPoint)
-        automaton.add_start_point_index(pointIdx)
+        automaton.add_start_point(startPoint)
 
     for endPoint in endPoints:
-        pointIdx = automaton.nodes.index(endPoint)
-        automaton.add_end_point_index(pointIdx)
+        automaton.add_end_point(endPoint)
 
     for connection in connections:
-        value = connection[1]
-        if not(value in abcSet):
-            raise BaseException("Invalid input: value (" + connection[1] + ") not present in abc!")
-        fromPointIdx = automaton.nodes.index(connection[0])
-        toPointIdx = automaton.nodes.index(connection[2])
-        automaton.add_connection(fromPointIdx, value, toPointIdx)
+        automaton.add_connection(connection[0], connection[1], connection[2])
 
     return automaton
