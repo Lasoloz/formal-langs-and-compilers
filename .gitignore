@@ -3,3 +3,6 @@ __pycache__
 get-pip.py
 
 laborok.pdf
+
+output.txt
+output.dot
